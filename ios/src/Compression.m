@@ -41,9 +41,6 @@
     CGFloat oldWidth = image.size.width;
     CGFloat oldHeight = image.size.height;
     
-   CGFloat oldWidth = image.size.width;
-    CGFloat oldHeight = image.size.height;
-    
     CGFloat widthRatio = maxWidth / oldWidth;
     CGFloat heightRatio = maxHeight / oldHeight;
     // Resize the image by whichever ratio will make the image smaller, satisfying both constraints.
