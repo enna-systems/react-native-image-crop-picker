@@ -528,7 +528,6 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                 }
             }];
         } else {
-            NSLog(@"An error occurred during export");
             completion(nil);
         }
     }];
