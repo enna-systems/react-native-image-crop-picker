@@ -116,36 +116,7 @@
     
     [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
     AVURLAsset *asset = [AVURLAsset URLAssetWithURL:inputURL options:nil];
-    AVMutableComposition* mixComposition = [[AVMutableComposition alloc] init];
-    if (asset!=NULL) {
-        //VIDEO TRACK
-        // Grab the source track from AVURLAsset for example.
-        AVAssetTrack *assetVideoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].lastObject;
-        
-        // Grab the composition video track from AVMutableComposition you already made.
-        AVMutableCompositionTrack *compositionVideoTrack = [mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
-        
-        [compositionVideoTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, asset.duration) ofTrack:[[asset tracksWithMediaType:AVMediaTypeVideo] objectAtIndex:0] atTime:kCMTimeZero error:nil];
-        
-        // Apply the original transform.
-        if (assetVideoTrack && compositionVideoTrack) {
-            [compositionVideoTrack setPreferredTransform:assetVideoTrack.preferredTransform];
-        }
-        
-        //AUDIO TRACK
-        AVMutableVideoCompositionInstruction * MainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
-        MainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, asset.duration);
-        
-        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-        [audioSession setCategory:AVAudioSessionCategoryPlayAndRecord error:nil];
-        [audioSession setActive:YES error:nil];
-        
-        AVMutableCompositionTrack *compositionAudioTrack = [mixComposition addMutableTrackWithMediaType:AVMediaTypeAudio preferredTrackID:kCMPersistentTrackID_Invalid];
-        
-        [compositionAudioTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, asset.duration) ofTrack:[[asset tracksWithMediaType:AVMediaTypeAudio] objectAtIndex:0] atTime:kCMTimeZero error:nil];
-    }
-           
-    AVAssetExportSession *exportSession = [[AVAssetExportSession alloc] initWithAsset:mixComposition presetName:preset];
+    AVAssetExportSession *exportSession = [[AVAssetExportSession alloc] initWithAsset:asset presetName:preset];
     exportSession.shouldOptimizeForNetworkUse = YES;
     exportSession.outputURL = outputURL;
     exportSession.outputFileType = AVFileTypeMPEG4;
