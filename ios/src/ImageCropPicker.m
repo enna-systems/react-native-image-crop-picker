@@ -417,52 +417,90 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
     });
 }
 
-- (void) handleVideo:(AVAsset*)asset withFileName:(NSString*)fileName withLocalIdentifier:(NSString*)localIdentifier completion:(void (^)(NSDictionary* image))completion {
-    NSURL *sourceURL = [(AVURLAsset *)asset URL];
-    
-    // extract creation date
-    AVMetadataItem *creationDateMeta = asset.creationDate;
-    NSDate *creationDate;
-    if (creationDateMeta) {
-        creationDate = creationDateMeta.dateValue;
+- (void)exportAVCompositionAsset:(AVAsset *)asset withCompletion:(void (^)(NSURL *sourceURL))completion {
+    if ([asset isKindOfClass:[AVComposition class]]) {
+        NSString *directory = [self getTmpDirectory]; // This method should return the temporary directory path
+        NSString *videoOutputFileName = [NSString stringWithFormat:@"slowMoVideo-%d.mov", arc4random() % 1000];
+        NSString *videoFileOutputPath = [directory stringByAppendingPathComponent:videoOutputFileName];
+        NSURL *videoFileOutputURL = [NSURL fileURLWithPath:videoFileOutputPath];
+
+        AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:asset presetName:AVAssetExportPresetHighestQuality];
+        exporter.outputURL = videoFileOutputURL;
+        exporter.outputFileType = AVFileTypeQuickTimeMovie;
+        exporter.shouldOptimizeForNetworkUse = YES;
+
+        [exporter exportAsynchronouslyWithCompletionHandler:^{
+            if (exporter.status == AVAssetExportSessionStatusCompleted) {
+                // Call the completion handler with the source URL
+                completion(videoFileOutputURL);
+            } else if (exporter.status == AVAssetExportSessionStatusFailed) {
+                completion(nil);
+            } else if (exporter.status == AVAssetExportSessionStatusCancelled) {
+                completion(nil);
+            }
+        }];
+    } else if ([asset isKindOfClass:[AVURLAsset class]]) {
+        // Directly return the source URL of AVURLAsset
+        NSURL *sourceURL = [(AVURLAsset *)asset URL];
+        completion(sourceURL);
+    } else {
+        // Handle unknown asset types
+        completion(nil);
     }
-    
-    // create temp file
-    NSString *tmpDirFullPath = [self getTmpDirectory];
-    NSString *filePath = [tmpDirFullPath stringByAppendingString:[[NSUUID UUID] UUIDString]];
-    filePath = [filePath stringByAppendingString:@".mp4"];
-    NSURL *outputURL = [NSURL fileURLWithPath:filePath];
-    
-    [self.compression compressVideo:sourceURL outputURL:outputURL withOptions:self.options handler:^(AVAssetExportSession *exportSession) {
-        if (exportSession.status == AVAssetExportSessionStatusCompleted) {
-            AVAsset *compressedAsset = [AVAsset assetWithURL:outputURL];
-            AVAssetTrack *track = [[compressedAsset tracksWithMediaType:AVMediaTypeVideo] firstObject];
+}
+
+
+- (void) handleVideo:(AVAsset*)asset withFileName:(NSString*)fileName withLocalIdentifier:(NSString*)localIdentifier completion:(void (^)(NSDictionary* image))completion {
+    [self exportAVCompositionAsset:asset withCompletion:^(NSURL *sourceURL) {
+        if (sourceURL) {
+            // extract creation date
+            AVMetadataItem *creationDateMeta = asset.creationDate;
+            NSDate *creationDate;
+            if (creationDateMeta) {
+                creationDate = creationDateMeta.dateValue;
+            }
             
-            NSNumber *fileSizeValue = nil;
-            [outputURL getResourceValue:&fileSizeValue
-                                 forKey:NSURLFileSizeKey
-                                  error:nil];
+            // create temp file
+            NSString *tmpDirFullPath = [self getTmpDirectory];
+            NSString *filePath = [tmpDirFullPath stringByAppendingString:[[NSUUID UUID] UUIDString]];
+            filePath = [filePath stringByAppendingString:@".mp4"];
+            NSURL *outputURL = [NSURL fileURLWithPath:filePath];
             
-            AVURLAsset *durationFromUrl = [AVURLAsset assetWithURL:outputURL];
-            CMTime time = [durationFromUrl duration];
-            int milliseconds = ceil(time.value/time.timescale) * 1000;
-            
-            completion([self createAttachmentResponse:[outputURL absoluteString]
-                                             withExif:nil
-                                        withSourceURL:[sourceURL absoluteString]
-                                  withLocalIdentifier:localIdentifier
-                                         withFilename:fileName
-                                            withWidth:[NSNumber numberWithFloat:track.naturalSize.width]
-                                           withHeight:[NSNumber numberWithFloat:track.naturalSize.height]
-                                             withMime:@"video/mp4"
-                                             withSize:fileSizeValue
-                                         withDuration:[NSNumber numberWithFloat:milliseconds]
-                                             withData:nil
-                                             withRect:CGRectNull
-                                     withCreationDate:creationDate
-                                 withModificationDate:nil
-                        ]);
+            [self.compression compressVideo:sourceURL outputURL:outputURL withOptions:self.options handler:^(AVAssetExportSession *exportSession) {
+                if (exportSession.status == AVAssetExportSessionStatusCompleted) {
+                    AVAsset *compressedAsset = [AVAsset assetWithURL:outputURL];
+                    AVAssetTrack *track = [[compressedAsset tracksWithMediaType:AVMediaTypeVideo] firstObject];
+                    
+                    NSNumber *fileSizeValue = nil;
+                    [outputURL getResourceValue:&fileSizeValue
+                                         forKey:NSURLFileSizeKey
+                                          error:nil];
+                    
+                    AVURLAsset *durationFromUrl = [AVURLAsset assetWithURL:outputURL];
+                    CMTime time = [durationFromUrl duration];
+                    int milliseconds = ceil(time.value/time.timescale) * 1000;
+                    
+                    completion([self createAttachmentResponse:[outputURL absoluteString]
+                                                     withExif:nil
+                                                withSourceURL:[sourceURL absoluteString]
+                                          withLocalIdentifier:localIdentifier
+                                                 withFilename:fileName
+                                                    withWidth:[NSNumber numberWithFloat:track.naturalSize.width]
+                                                   withHeight:[NSNumber numberWithFloat:track.naturalSize.height]
+                                                     withMime:@"video/mp4"
+                                                     withSize:fileSizeValue
+                                                 withDuration:[NSNumber numberWithFloat:milliseconds]
+                                                     withData:nil
+                                                     withRect:CGRectNull
+                                             withCreationDate:creationDate
+                                         withModificationDate:nil
+                                ]);
+                } else {
+                    completion(nil);
+                }
+            }];
         } else {
+            NSLog(@"An error occurred during export");
             completion(nil);
         }
     }];
