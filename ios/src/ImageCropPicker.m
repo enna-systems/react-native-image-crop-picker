@@ -417,25 +417,24 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
     });
 }
 
+// see: https://github.com/expo/expo/commit/c466da0c58e69e5517a37ac5d2e44f36e9f0d5c6
 - (void)exportAVCompositionAsset:(AVAsset *)asset withCompletion:(void (^)(NSURL *sourceURL))completion {
     if ([asset isKindOfClass:[AVComposition class]]) {
         NSString *directory = [self getTmpDirectory]; // This method should return the temporary directory path
-        NSString *videoOutputFileName = [NSString stringWithFormat:@"slowMoVideo-%d.mov", arc4random() % 1000];
+        NSString *videoOutputFileName = [NSString stringWithFormat:@"slowMoVideo-%d.mp4", arc4random() % 1000];
         NSString *videoFileOutputPath = [directory stringByAppendingPathComponent:videoOutputFileName];
         NSURL *videoFileOutputURL = [NSURL fileURLWithPath:videoFileOutputPath];
 
-        AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:asset presetName:AVAssetExportPresetHighestQuality];
+        AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:asset presetName:AVAssetExportPresetMediumQuality];
         exporter.outputURL = videoFileOutputURL;
-        exporter.outputFileType = AVFileTypeQuickTimeMovie;
+        exporter.outputFileType = AVFileTypeMPEG4; //AVFileTypeQuickTimeMovie;
         exporter.shouldOptimizeForNetworkUse = YES;
 
         [exporter exportAsynchronouslyWithCompletionHandler:^{
             if (exporter.status == AVAssetExportSessionStatusCompleted) {
                 // Call the completion handler with the source URL
                 completion(videoFileOutputURL);
-            } else if (exporter.status == AVAssetExportSessionStatusFailed) {
-                completion(nil);
-            } else if (exporter.status == AVAssetExportSessionStatusCancelled) {
+            } else {
                 completion(nil);
             }
         }];
