@@ -35,7 +35,6 @@
 #import "QBImagePicker/QBImagePicker.h"
 #endif
 
-
 #import <TOCropViewController/TOCropViewController.h>
 
 #import "UIImage+Resize.h"
@@ -43,25 +42,27 @@
 #import "Compression.h"
 #import <math.h>
 
-@interface ImageCropPicker : NSObject<
-UIImagePickerControllerDelegate,
-UINavigationControllerDelegate,
-RCTBridgeModule,
-QBImagePickerControllerDelegate,
-TOCropViewControllerDelegate>
+@interface ImageCropPicker : NSObject <
+                                 UIImagePickerControllerDelegate,
+                                 UINavigationControllerDelegate,
+                                 RCTBridgeModule,
+                                 QBImagePickerControllerDelegate,
+                                 TOCropViewControllerDelegate>
 
-typedef enum selectionMode {
+typedef enum selectionMode
+{
     CAMERA,
     CROPPING,
     PICKER
 } SelectionMode;
 
-@property (nonatomic, strong) NSMutableDictionary *croppingFile;
-@property (nonatomic, strong) NSDictionary *defaultOptions;
-@property (nonatomic, strong) Compression *compression;
-@property (nonatomic, retain) NSMutableDictionary *options;
-@property (nonatomic, strong) RCTPromiseResolveBlock resolve;
-@property (nonatomic, strong) RCTPromiseRejectBlock reject;
+@property(nonatomic, strong) NSMutableDictionary *croppingFile;
+@property(nonatomic, strong) NSDictionary *defaultOptions;
+@property(nonatomic, strong) NSDictionary *exportPresets;
+@property(nonatomic, strong) Compression *compression;
+@property(nonatomic, retain) NSMutableDictionary *options;
+@property(nonatomic, strong) RCTPromiseResolveBlock resolve;
+@property(nonatomic, strong) RCTPromiseRejectBlock reject;
 @property SelectionMode currentSelectionMode;
 
 @end
