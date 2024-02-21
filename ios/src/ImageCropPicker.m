@@ -75,6 +75,24 @@ RCT_EXPORT_MODULE();
             @"cropperRotateButtonsHidden": @NO
         };
         self.compression = [[Compression alloc] init];
+        NSMutableDictionary *dic = [[NSMutableDictionary alloc] initWithDictionary:@{
+                                                                                     @"640x480": AVAssetExportPreset640x480,
+                                                                                     @"960x540": AVAssetExportPreset960x540,
+                                                                                     @"1280x720": AVAssetExportPreset1280x720,
+                                                                                     @"1920x1080": AVAssetExportPreset1920x1080,
+                                                                                     @"LowQuality": AVAssetExportPresetLowQuality,
+                                                                                     @"MediumQuality": AVAssetExportPresetMediumQuality,
+                                                                                     @"HighestQuality": AVAssetExportPresetHighestQuality,
+                                                                                     @"Passthrough": AVAssetExportPresetPassthrough,
+                                                                                     }];
+        
+        if (@available(iOS 9.0, *)) {
+            [dic addEntriesFromDictionary:@{@"3840x2160": AVAssetExportPreset3840x2160}];
+        } else {
+            // Fallback on earlier versions
+        }
+        
+        self.exportPresets = dic;
     }
     
     return self;
@@ -424,8 +442,19 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         NSString *videoOutputFileName = [NSString stringWithFormat:@"slowMoVideo-%d.mp4", arc4random() % 1000];
         NSString *videoFileOutputPath = [directory stringByAppendingPathComponent:videoOutputFileName];
         NSURL *videoFileOutputURL = [NSURL fileURLWithPath:videoFileOutputPath];
+        
+        // set quality from user options
+        NSString *presetKey = [self.options valueForKey:@"compressVideoPreset"];
+        if (presetKey == nil) {
+            presetKey = @"MediumQuality";
+        }
+        
+        NSString *preset = [self.exportPresets valueForKey:presetKey];
+        if (preset == nil) {
+            preset = AVAssetExportPresetMediumQuality;
+        }
 
-        AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:asset presetName:AVAssetExportPresetMediumQuality];
+        AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:asset presetName:preset];
         exporter.outputURL = videoFileOutputURL;
         exporter.outputFileType = AVFileTypeMPEG4; //AVFileTypeQuickTimeMovie;
         exporter.shouldOptimizeForNetworkUse = YES;
