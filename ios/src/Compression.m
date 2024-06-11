@@ -50,10 +50,10 @@
     int newHeight = oldHeight * resizeRatio;
     CGSize newSize = CGSizeMake(newWidth, newHeight);
     
-    UIGraphicsBeginImageContext(newSize);
-    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
-    UIImage *resizedImage = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:newSize];
+    UIImage *resizedImage = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
+        [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    }];
     
     result.width = [NSNumber numberWithFloat:newWidth];
     result.height = [NSNumber numberWithFloat:newHeight];
