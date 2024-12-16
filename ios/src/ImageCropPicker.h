@@ -42,7 +42,7 @@
 #import "Compression.h"
 #import <math.h>
 
-@interface ImageCropPicker : NSObject <
+@interface ImageCropPicker : NSObject<
 UIImagePickerControllerDelegate,
 UINavigationControllerDelegate,
 RCTBridgeModule,
