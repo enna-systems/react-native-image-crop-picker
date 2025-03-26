@@ -58,6 +58,7 @@
     result.width = [NSNumber numberWithFloat:newWidth];
     result.height = [NSNumber numberWithFloat:newHeight];
     result.image = resizedImage;
+
     return result;
 }
 
