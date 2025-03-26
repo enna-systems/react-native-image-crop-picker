@@ -41,24 +41,27 @@
     CGFloat oldWidth = image.size.width;
     CGFloat oldHeight = image.size.height;
     
-    CGFloat widthRatio = maxWidth / oldWidth;
-    CGFloat heightRatio = maxHeight / oldHeight;
-    // Resize the image by whichever ratio will make the image smaller, satisfying both constraints.
-    CGFloat resizeRatio = widthRatio < heightRatio ? widthRatio : heightRatio;
+    CGFloat widthScale = maxWidth / oldWidth;
+    CGFloat heightScale = maxHeight / oldHeight;
+    CGFloat scaleFactor = MIN(widthScale, heightScale);
 
-    int newWidth = oldWidth * resizeRatio;
-    int newHeight = oldHeight * resizeRatio;
+    CGFloat newWidth = oldWidth * scaleFactor;
+    CGFloat newHeight = oldHeight * scaleFactor;
+
     CGSize newSize = CGSizeMake(newWidth, newHeight);
-    
-    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:newSize];
+
+    UIGraphicsImageRendererFormat *format = [[UIGraphicsImageRendererFormat alloc] init];
+    format.scale = image.scale;
+
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:newSize format:format];
     UIImage *resizedImage = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
         [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
     }];
-    
-    result.width = [NSNumber numberWithFloat:newWidth];
-    result.height = [NSNumber numberWithFloat:newHeight];
-    result.image = resizedImage;
 
+    result.width = @(newWidth);
+    result.height = @(newHeight);
+    result.image = resizedImage;
+    
     return result;
 }
 
