@@ -548,7 +548,6 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                     @Override
                     public void invoke(Object... args) {
                         String videoPath = (String) args[0];
-
                         try {
                             File file = new File(videoPath);
                             Uri videoUri = Uri.fromFile(file);
@@ -704,6 +703,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                         orientation == ExifInterface.ORIENTATION_TRANSVERSE
         );
 
+        
         // if compression options are provided image will be compressed. If none options is provided,
         // then original image will be returned
         File compressedImage = compression.compressImage(this.reactContext, options, path, original);
