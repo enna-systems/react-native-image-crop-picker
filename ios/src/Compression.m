@@ -47,7 +47,7 @@
 
     CGFloat newWidth = oldWidth * scaleFactor;
     CGFloat newHeight = oldHeight * scaleFactor;
-
+    
     CGSize newSize = CGSizeMake(newWidth, newHeight);
 
     UIGraphicsImageRendererFormat *format = [[UIGraphicsImageRendererFormat alloc] init];
