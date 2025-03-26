@@ -49,8 +49,7 @@ RCTBridgeModule,
 QBImagePickerControllerDelegate,
 TOCropViewControllerDelegate>
 
-typedef enum selectionMode
-{
+typedef enum selectionMode {
     CAMERA,
     CROPPING,
     PICKER
@@ -63,7 +62,7 @@ typedef enum selectionMode
 @property (nonatomic, retain) NSMutableDictionary *options;
 @property (nonatomic, strong) RCTPromiseResolveBlock resolve;
 @property (nonatomic, strong) RCTPromiseRejectBlock reject;
-@property (nonatomic) SelectionMode currentSelectionMode;
+@property SelectionMode currentSelectionMode;
 
 @end
 
