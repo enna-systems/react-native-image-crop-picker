@@ -40,7 +40,7 @@
     
     CGFloat oldWidth = image.size.width;
     CGFloat oldHeight = image.size.height;
-    
+
     CGFloat widthScale = maxWidth / oldWidth;
     CGFloat heightScale = maxHeight / oldHeight;
     CGFloat scaleFactor = MIN(widthScale, heightScale);
@@ -57,7 +57,7 @@
     UIImage *resizedImage = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
         [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
     }];
-
+    
     result.width = @(newWidth);
     result.height = @(newHeight);
     result.image = resizedImage;
