@@ -3,8 +3,8 @@ package com.reactnative.ivpusic.imagepicker;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
-import android.content.Context;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -18,9 +18,12 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
+import androidx.activity.result.PickVisualMediaRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
+import androidx.exifinterface.media.ExifInterface;
 
 import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.Callback;
@@ -40,8 +43,8 @@ import com.yalantis.ucrop.UCropActivity;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -70,6 +73,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
     private static final String E_CAMERA_IS_NOT_AVAILABLE = "E_CAMERA_IS_NOT_AVAILABLE";
     private static final String E_CANNOT_LAUNCH_CAMERA = "E_CANNOT_LAUNCH_CAMERA";
     private static final String E_ERROR_WHILE_CLEANING_FILES = "E_ERROR_WHILE_CLEANING_FILES";
+    private static final String E_LOW_MEMORY_ERROR = "E_LOW_MEMORY_ERROR";
 
     private static final String E_NO_LIBRARY_PERMISSION_KEY = "E_NO_LIBRARY_PERMISSION";
     private static final String E_NO_LIBRARY_PERMISSION_MSG = "User did not grant library permission.";
@@ -99,6 +103,8 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
 
     private int width = 0;
     private int height = 0;
+
+    private int maxFiles = 5;
 
     private Uri mCameraCaptureURI;
     private String mCurrentMediaPath;
@@ -131,6 +137,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         includeExif = options.hasKey("includeExif") && options.getBoolean("includeExif");
         width = options.hasKey("width") ? options.getInt("width") : 0;
         height = options.hasKey("height") ? options.getInt("height") : 0;
+        maxFiles = options.hasKey("maxFiles") ? options.getInt("maxFiles") : maxFiles;
         cropping = options.hasKey("cropping") && options.getBoolean("cropping");
         cropperActiveWidgetColor = options.hasKey("cropperActiveWidgetColor") ? options.getString("cropperActiveWidgetColor") : null;
         cropperStatusBarColor = options.hasKey("cropperStatusBarColor") ? options.getString("cropperStatusBarColor") : null;
@@ -364,28 +371,25 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
 
     private void initiatePicker(final Activity activity) {
         try {
-            final Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
-
-            if (cropping || mediaType.equals("photo")) {
-                galleryIntent.setType("image/*");
-                if (cropping) {
-                    String[] mimetypes = {"image/jpeg", "image/png"};
-                    galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimetypes);
-                }
-            } else if (mediaType.equals("video")) {
-                galleryIntent.setType("video/*");
+            PickVisualMediaRequest.Builder builder = new PickVisualMediaRequest.Builder();
+            // Simplified media type handling
+            if (mediaType.equals("video")) {
+                builder.setMediaType(ActivityResultContracts.PickVisualMedia.VideoOnly.INSTANCE);
+            } else if (mediaType.equals("photo") || cropping) {
+                // Force image-only for cropping
+                builder.setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE);
             } else {
-                galleryIntent.setType("*/*");
-                String[] mimetypes = {"image/*", "video/*"};
-                galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimetypes);
+                builder.setMediaType(ActivityResultContracts.PickVisualMedia.ImageAndVideo.INSTANCE);
             }
 
-            galleryIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            galleryIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
-            galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
+            Intent intent;
+            if (multiple) {
+                intent = new ActivityResultContracts.PickMultipleVisualMedia(maxFiles).createIntent(activity, builder.build());
+            } else {
+                intent = new ActivityResultContracts.PickVisualMedia().createIntent(activity, builder.build());
+            }
 
-            final Intent chooserIntent = Intent.createChooser(galleryIntent, "Pick an image");
-            activity.startActivityForResult(chooserIntent, IMAGE_PICKER_REQUEST);
+            activity.startActivityForResult(intent, IMAGE_PICKER_REQUEST);
         } catch (Exception e) {
             resultCollector.notifyProblem(E_FAILED_TO_SHOW_PICKER, e);
         }
@@ -508,15 +512,16 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         resultCollector.notifySuccess(getImage(activity, path));
     }
 
-    private Bitmap validateVideo(String path) throws Exception {
+    private Bitmap validateVideo(Uri uri) throws Exception {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        retriever.setDataSource(path);
+        retriever.setDataSource(getCurrentActivity(), uri);
         Bitmap bmp = retriever.getFrameAtTime();
 
         if (bmp == null) {
             throw new Exception("Cannot retrieve video data");
         }
 
+        retriever.release();
         return bmp;
     }
 
@@ -533,7 +538,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
     }
 
     private void getVideo(final Activity activity, final String path, final String mime) throws Exception {
-        validateVideo(path);
+        validateVideo(Uri.parse(path));
         final String compressedVideoPath = getTmpDir(activity) + "/" + UUID.randomUUID().toString() + ".mp4";
 
         new Thread(new Runnable() {
@@ -543,21 +548,24 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                     @Override
                     public void invoke(Object... args) {
                         String videoPath = (String) args[0];
-
                         try {
-                            Bitmap bmp = validateVideo(videoPath);
-                            long modificationDate = new File(videoPath).lastModified();
+                            File file = new File(videoPath);
+                            Uri videoUri = Uri.fromFile(file);
+                            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+                            retriever.setDataSource(activity, videoUri);
+                            Bitmap bmp = retriever.getFrameAtTime();
                             long duration = getVideoDuration(videoPath);
 
                             WritableMap video = new WritableNativeMap();
                             video.putInt("width", bmp.getWidth());
                             video.putInt("height", bmp.getHeight());
                             video.putString("mime", mime);
-                            video.putInt("size", (int) new File(videoPath).length());
+                            video.putInt("size", (int) file.length());
                             video.putInt("duration", (int) duration);
                             video.putString("path", "file://" + videoPath);
-                            video.putString("modificationDate", String.valueOf(modificationDate));
+                            video.putString("modificationDate", String.valueOf(file.lastModified()));
 
+                            retriever.release();
                             resultCollector.notifySuccess(video);
                         } catch (Exception e) {
                             resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, e);
@@ -589,6 +597,11 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // For videos, get the real path but don't copy the file
+            String mimeType = activity.getContentResolver().getType(uri);
+            if (mimeType != null && mimeType.startsWith("video/")) {
+                return RealPathUtil.getRealPathFromURI(activity, uri);
+            }
 
             String externalCacheDirPath = Uri.fromFile(activity.getExternalCacheDir()).getPath();
             String externalFilesDirPath = Uri.fromFile(activity.getExternalFilesDir(null)).getPath();
@@ -681,6 +694,15 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             throw new Exception("Cannot select remote files");
         }
         BitmapFactory.Options original = validateImage(path);
+        ExifInterface originalExif = new ExifInterface(path);
+        int orientation = originalExif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1);
+        boolean invertDimensions = (
+                orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                        orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                        orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                        orientation == ExifInterface.ORIENTATION_TRANSVERSE
+        );
+
 
         // if compression options are provided image will be compressed. If none options is provided,
         // then original image will be returned
@@ -690,11 +712,12 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         long modificationDate = new File(path).lastModified();
 
         image.putString("path", "file://" + compressedImagePath);
-        image.putInt("width", options.outWidth);
-        image.putInt("height", options.outHeight);
+        image.putInt("width", invertDimensions ? options.outHeight : options.outWidth);
+        image.putInt("height", invertDimensions ? options.outWidth : options.outHeight);
         image.putString("mime", options.outMimeType);
         image.putInt("size", (int) new File(compressedImagePath).length());
         image.putString("modificationDate", String.valueOf(modificationDate));
+        image.putString("filename", new File(path).getName());
 
         if (includeBase64) {
             image.putString("data", getBase64StringFromFile(compressedImagePath));
@@ -793,7 +816,17 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             } else {
                 Uri uri = data.getData();
 
+                // if the result comes in clipData format (which apparently it does in some cases)
                 if (uri == null) {
+                    ClipData clipData = data.getClipData();
+                    if (clipData != null && clipData.getItemCount() > 0) {
+                        ClipData.Item item = clipData.getItemAt(0);
+                        uri = item.getUri();
+                    }
+                }
+
+                // error out if uri is still null
+                if(uri == null) {
                     resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, "Cannot resolve image url");
                     return;
                 }
@@ -849,7 +882,12 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             if (resultUri != null) {
                 try {
                     if (width > 0 && height > 0) {
-                        File resized = compression.resize(this.reactContext, resultUri.getPath(), width, height, width, height, 100);
+                        File resized = null;
+                        try{
+                            resized = compression.resize(this.reactContext, resultUri.getPath(), width, height, width, height, 100);
+                        } catch (OutOfMemoryError ex) {
+                                 resultCollector.notifyProblem(E_LOW_MEMORY_ERROR, ex.getMessage());
+                        }
                         resultUri = Uri.fromFile(resized);
                     }
 
